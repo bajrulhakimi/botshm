@@ -9,6 +9,7 @@ from app.analyzer import scan_all_stocks
 from app.config import ensure_directories, settings
 from app.database import save_scan_results
 from app.report_generator import generate_text_report, save_text_report
+from app.stock_universe import DEFAULT_GROUP
 from app.telegram_bot import send_top_results
 
 
@@ -20,12 +21,12 @@ def _configure_timezone() -> None:
 
 def run_scan_and_send() -> None:
     ensure_directories()
-    results = scan_all_stocks()
+    results = scan_all_stocks(DEFAULT_GROUP)
     save_scan_results(results)
-    report_path = save_text_report(results)
-    print(generate_text_report(results))
+    report_path = save_text_report(results, group_name=DEFAULT_GROUP)
+    print(generate_text_report(results, group_name=DEFAULT_GROUP))
     print(f"Laporan tersimpan: {report_path}")
-    send_top_results(results, top_n=settings.top_n)
+    send_top_results(results, top_n=settings.top_n, group_name=DEFAULT_GROUP)
 
 
 def run_scheduler() -> None:
@@ -47,4 +48,3 @@ def run_scheduler() -> None:
     while True:
         schedule.run_pending()
         time.sleep(30)
-

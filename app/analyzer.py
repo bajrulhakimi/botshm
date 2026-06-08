@@ -7,10 +7,11 @@ from typing import Any
 import pandas as pd
 
 from app.config import settings
-from app.data_fetcher import fetch_daily_prices, load_stock_codes
+from app.data_fetcher import fetch_daily_prices
 from app.indicators import add_technical_indicators
 from app.risk_manager import calculate_trade_plan
 from app.scoring import build_rsi_note, calculate_score, classify_score
+from app.stock_universe import DEFAULT_GROUP, load_group_symbols
 
 
 ESSENTIAL_COLUMNS = [
@@ -201,11 +202,11 @@ def analyze_stock(code: str) -> StockAnalysis | None:
     )
 
 
-def scan_all_stocks() -> list[StockAnalysis]:
+def scan_all_stocks(group_name: str = DEFAULT_GROUP) -> list[StockAnalysis]:
     results: list[StockAnalysis] = []
-    codes = load_stock_codes()
+    codes = load_group_symbols(group_name)
     if not codes:
-        print("Daftar saham kosong.")
+        print(f"Daftar saham group {group_name} kosong.")
         return results
 
     for code in codes:
@@ -219,4 +220,3 @@ def scan_all_stocks() -> list[StockAnalysis]:
 
     results.sort(key=lambda item: item.score, reverse=True)
     return results
-

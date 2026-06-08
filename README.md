@@ -18,6 +18,7 @@ Analisa ini hanya alat bantu screening, bukan rekomendasi beli/jual resmi. Semua
 ## Fitur
 
 - Scan 300 saham IDX lintas sektor dari `data/stocks.csv`.
+- Pilih universe/group saham seperti `all`, `lq45`, `idx30`, `idx80`, `kompas100`, `jii`, `high-dividend`, `esg`, `msci`, `banking`, `energy`, `mining`, `consumer`, `telecom`, `property`, dan `technology`.
 - Otomatis mengubah kode IDX menjadi format Yahoo Finance `.JK`, contoh `BBCA` menjadi `BBCA.JK`.
 - Ambil data harga harian minimal 1 tahun. Default kode memakai `2y` agar MA200 lebih stabil.
 - Hitung MA5, MA10, MA20, MA50, MA100, MA200, EMA12, EMA26, RSI14, MACD, MACD Signal, MACD Histogram, Volume MA20, Volume Ratio, Support 20H, Resistance 20H, ATR14, perubahan harian, mingguan, dan bulanan.
@@ -45,6 +46,11 @@ idx-free-stock-analyzer-bot/
 |   `-- scheduler.py
 |-- data/
 |   |-- stocks.csv
+|   |-- groups/
+|   |   |-- all.csv
+|   |   |-- lq45.csv
+|   |   |-- idx30.csv
+|   |   `-- ...
 |   `-- watchlist.csv
 |-- reports/
 |   `-- .gitkeep
@@ -151,9 +157,13 @@ Command yang tersedia:
 
 ```bash
 python main.py scan
+python main.py scan --group lq45
 python main.py send
+python main.py send --group idx30
 python main.py stock BBCA
 python main.py export
+python main.py export --group msci
+python main.py groups
 python main.py schedule
 python main.py telegram
 python main.py test-telegram
@@ -163,11 +173,127 @@ Di VPS, gunakan:
 
 ```bash
 ./venv/bin/python main.py scan
+./venv/bin/python main.py scan --group lq45
 ./venv/bin/python main.py send
+./venv/bin/python main.py send --group idx30
 ./venv/bin/python main.py stock BBCA
 ./venv/bin/python main.py export
+./venv/bin/python main.py export --group msci
+./venv/bin/python main.py groups
 ./venv/bin/python main.py telegram
 ./venv/bin/python main.py test-telegram
+```
+
+Default:
+
+- `python main.py scan` sama dengan `python main.py scan --group all`.
+- `python main.py send` sama dengan `python main.py send --group all`.
+- `python main.py export` sama dengan `python main.py export --group all`.
+
+Jika group salah, program menampilkan:
+
+```text
+Group tidak ditemukan. Gunakan python main.py groups untuk melihat daftar group.
+```
+
+## Group Saham
+
+Daftar group tersedia:
+
+```bash
+python main.py groups
+```
+
+Output:
+
+```text
+Available groups:
+- all
+- lq45
+- idx30
+- idx80
+- kompas100
+- jii
+- high-dividend
+- esg
+- msci
+- banking
+- energy
+- mining
+- consumer
+- telecom
+- property
+- technology
+```
+
+File group ada di `data/groups/`:
+
+```text
+data/groups/
+|-- all.csv
+|-- lq45.csv
+|-- idx30.csv
+|-- idx80.csv
+|-- kompas100.csv
+|-- jii.csv
+|-- high-dividend.csv
+|-- esg.csv
+|-- msci.csv
+|-- banking.csv
+|-- energy.csv
+|-- mining.csv
+|-- consumer.csv
+|-- telecom.csv
+|-- property.csv
+`-- technology.csv
+```
+
+Format CSV:
+
+```csv
+symbol,name
+BBCA,Bank Central Asia Tbk
+BBRI,Bank Rakyat Indonesia Tbk
+BMRI,Bank Mandiri Tbk
+```
+
+Catatan penting:
+
+- `all` tetap membaca semua saham dari `data/stocks.csv`.
+- File `data/groups/all.csv` disediakan sebagai referensi manual.
+- Daftar indeks seperti LQ45, IDX30, IDX80, Kompas100, JII, High Dividend, ESG, dan MSCI bisa berubah berkala.
+- Karena bot ini memakai data gratis dan tidak memakai API premium IDX/MSCI, isi `data/groups/*.csv` dibuat manual dan perlu diupdate berkala.
+
+Cara menambah saham ke group:
+
+1. Buka file group, contoh `data/groups/lq45.csv`.
+2. Tambahkan baris baru:
+
+```csv
+BBTN,Bank Tabungan Negara Tbk
+```
+
+3. Simpan file, lalu jalankan:
+
+```bash
+python main.py scan --group lq45
+```
+
+Cara menghapus saham dari group:
+
+1. Buka file group.
+2. Hapus baris saham yang tidak ingin discan.
+3. Simpan file.
+
+Cara update daftar LQ45/IDX30/MSCI manual:
+
+1. Cek pengumuman indeks terbaru dari BEI/IDX, Kustodian, manajer investasi indeks, atau penyedia indeks terkait.
+2. Edit file group yang sesuai, contoh `data/groups/lq45.csv`, `data/groups/idx30.csv`, atau `data/groups/msci.csv`.
+3. Pastikan kolom pertama adalah kode saham tanpa `.JK`.
+4. Jalankan scan ulang:
+
+```bash
+python main.py scan --group lq45
 ```
 
 ## Menjalankan dari Telegram
@@ -198,26 +324,41 @@ Selama proses ini hidup, kirim command berikut dari Telegram:
 /status
 /stock BBCA
 /scan
+/scan lq45
 /send
-/export
+/send idx30
+/export msci
+/groups
 /disclaimer
 ```
 
 Keterangan:
 
 - `/stock BBCA` menganalisa satu saham dan membalas laporan lengkap.
-- `/scan` atau `/send` scan semua saham, simpan TXT/SQLite, lalu kirim top hasil ke Telegram.
-- `/export` scan semua saham, simpan TXT/SQLite/CSV, lalu mengirim file CSV ke Telegram.
+- `/scan` atau `/send` scan group `all`, simpan TXT/SQLite, lalu kirim top hasil ke Telegram.
+- `/scan lq45` atau `/send idx30` scan group tertentu.
+- `/export msci` scan group tertentu, simpan TXT/SQLite/CSV, lalu mengirim file CSV ke Telegram.
+- `/groups` menampilkan daftar group yang tersedia.
 - Bot hanya menerima command dari `TELEGRAM_CHAT_ID` yang ada di `.env`.
 
 Catatan: command `/scan`, `/send`, dan `/export` bisa memakan waktu beberapa menit karena mengambil data dari yfinance.
 
 ## Output
 
-- Laporan TXT: `reports/report_YYYY-MM-DD.txt`
-- Export CSV: `reports/screening_YYYY-MM-DD.csv`
+- Laporan TXT: `reports/report_GROUP_YYYY-MM-DD.txt`
+- Export CSV: `reports/screening_GROUP_YYYY-MM-DD.csv`
 - Database SQLite: `data/scan_results.sqlite3`
 - Log cron: `logs/cron.log`
+
+Contoh:
+
+```text
+reports/report_lq45_YYYY-MM-DD.txt
+reports/report_idx30_YYYY-MM-DD.txt
+reports/report_msci_YYYY-MM-DD.txt
+reports/report_all_YYYY-MM-DD.txt
+reports/screening_lq45_YYYY-MM-DD.csv
+```
 
 ## Menjalankan Otomatis dengan Cron
 

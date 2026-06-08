@@ -15,6 +15,13 @@ from app.report_generator import (
     format_risk_reward,
     today_string,
 )
+from app.stock_universe import (
+    DEFAULT_GROUP,
+    GROUP_NOT_FOUND_MESSAGE,
+    format_group_label,
+    get_available_groups,
+    validate_group,
+)
 
 if TYPE_CHECKING:
     from app.analyzer import StockAnalysis
@@ -32,8 +39,10 @@ Command:
 /status - cek bot aktif
 /stock BBCA - analisa satu saham
 /scan - scan semua saham dan kirim top hasil
-/send - sama seperti /scan
-/export - scan semua saham dan kirim file CSV
+/scan lq45 - scan group tertentu
+/send idx30 - sama seperti /scan untuk group tertentu
+/export lq45 - scan group lalu kirim file CSV
+/groups - tampilkan daftar group
 /disclaimer - tampilkan disclaimer
 
 Catatan: data dari yfinance bisa delay dan bukan data real-time resmi IDX.
@@ -113,10 +122,15 @@ def send_document(file_path: str, caption: str = "", chat_id: str | None = None)
     return True
 
 
-def build_top_results_message(results: list[StockAnalysis], top_n: int | None = None) -> str:
+def build_top_results_message(
+    results: list[StockAnalysis],
+    top_n: int | None = None,
+    group_name: str = DEFAULT_GROUP,
+) -> str:
     shown_results = results[: top_n or settings.top_n]
     lines = [
-        "HASIL SCREENING SAHAM IDX GRATIS",
+        "HASIL SCREENING SAHAM IDX",
+        f"Group: {format_group_label(group_name)}",
         f"Tanggal: {today_string()}",
         "Sumber data: Yahoo Finance / yfinance",
         "Catatan: data bukan real-time resmi IDX.",
@@ -144,8 +158,12 @@ def build_top_results_message(results: list[StockAnalysis], top_n: int | None = 
     return "\n".join(lines).strip()
 
 
-def send_top_results(results: list[StockAnalysis], top_n: int | None = None) -> bool:
-    return send_message(build_top_results_message(results, top_n=top_n))
+def send_top_results(
+    results: list[StockAnalysis],
+    top_n: int | None = None,
+    group_name: str = DEFAULT_GROUP,
+) -> bool:
+    return send_message(build_top_results_message(results, top_n=top_n, group_name=group_name))
 
 
 def test_telegram() -> bool:
@@ -190,6 +208,14 @@ def _normalize_command(text: str) -> tuple[str, list[str]]:
     return command, parts[1:]
 
 
+def _parse_group_arg(args: list[str]) -> str:
+    if not args:
+        return DEFAULT_GROUP
+    if args[0] == "--group" and len(args) > 1:
+        return args[1]
+    return args[0]
+
+
 def _is_authorized(chat_id: str) -> bool:
     return str(chat_id) == str(settings.telegram_chat_id)
 
@@ -220,18 +246,30 @@ def _handle_stock_command(args: list[str], chat_id: str) -> None:
     send_message(generate_text_report([result]), chat_id=chat_id)
 
 
-def _handle_scan_command(chat_id: str) -> None:
-    send_message("Scan semua saham sedang diproses. Ini bisa butuh beberapa menit.", chat_id=chat_id)
+def _handle_scan_command(args: list[str], chat_id: str) -> None:
+    try:
+        group_name = validate_group(_parse_group_arg(args))
+    except ValueError:
+        send_message(GROUP_NOT_FOUND_MESSAGE, chat_id=chat_id)
+        return
+
+    send_message(
+        f"Scan group {format_group_label(group_name)} sedang diproses. Ini bisa butuh beberapa menit.",
+        chat_id=chat_id,
+    )
 
     from app.analyzer import scan_all_stocks
     from app.database import save_scan_results
     from app.report_generator import save_text_report
 
     try:
-        results = scan_all_stocks()
+        results = scan_all_stocks(group_name)
         saved_rows = save_scan_results(results)
-        report_path = save_text_report(results)
-        send_message(build_top_results_message(results, top_n=settings.top_n), chat_id=chat_id)
+        report_path = save_text_report(results, group_name=group_name)
+        send_message(
+            build_top_results_message(results, top_n=settings.top_n, group_name=group_name),
+            chat_id=chat_id,
+        )
         send_message(
             f"Scan selesai. {saved_rows} baris tersimpan ke SQLite.\n"
             f"Laporan TXT tersimpan di server: {report_path}",
@@ -241,20 +279,36 @@ def _handle_scan_command(chat_id: str) -> None:
         send_message(f"Scan gagal: {exc}", chat_id=chat_id)
 
 
-def _handle_export_command(chat_id: str) -> None:
-    send_message("Export CSV sedang diproses. Mohon tunggu...", chat_id=chat_id)
+def _handle_export_command(args: list[str], chat_id: str) -> None:
+    try:
+        group_name = validate_group(_parse_group_arg(args))
+    except ValueError:
+        send_message(GROUP_NOT_FOUND_MESSAGE, chat_id=chat_id)
+        return
+
+    send_message(
+        f"Export CSV group {format_group_label(group_name)} sedang diproses. Mohon tunggu...",
+        chat_id=chat_id,
+    )
 
     from app.analyzer import scan_all_stocks
     from app.database import save_scan_results
     from app.report_generator import export_csv, save_text_report
 
     try:
-        results = scan_all_stocks()
+        results = scan_all_stocks(group_name)
         save_scan_results(results)
-        save_text_report(results)
-        csv_path = export_csv(results)
-        send_message(build_top_results_message(results, top_n=settings.top_n), chat_id=chat_id)
-        send_document(str(csv_path), caption=f"Export screening saham {today_string()}", chat_id=chat_id)
+        save_text_report(results, group_name=group_name)
+        csv_path = export_csv(results, group_name=group_name)
+        send_message(
+            build_top_results_message(results, top_n=settings.top_n, group_name=group_name),
+            chat_id=chat_id,
+        )
+        send_document(
+            str(csv_path),
+            caption=f"Export screening {format_group_label(group_name)} {today_string()}",
+            chat_id=chat_id,
+        )
     except Exception as exc:
         send_message(f"Export gagal: {exc}", chat_id=chat_id)
 
@@ -275,12 +329,15 @@ def handle_telegram_message(message: dict) -> None:
         send_message(HELP_MESSAGE, chat_id=chat_id)
     elif command == "/status":
         send_message("Bot aktif dan siap menerima command.", chat_id=chat_id)
+    elif command == "/groups":
+        groups = "\n".join(f"- {group}" for group in get_available_groups())
+        send_message("Available groups:\n" + groups, chat_id=chat_id)
     elif command == "/stock":
         _handle_stock_command(args, chat_id)
     elif command in {"/scan", "/send"}:
-        _handle_scan_command(chat_id)
+        _handle_scan_command(args, chat_id)
     elif command == "/export":
-        _handle_export_command(chat_id)
+        _handle_export_command(args, chat_id)
     elif command == "/disclaimer":
         send_message(f"{DISCLAIMER}\n\nBatasan data: {DATA_LIMITATION}", chat_id=chat_id)
     else:

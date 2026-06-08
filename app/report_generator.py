@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from app.config import ensure_directories, settings
+from app.stock_universe import DEFAULT_GROUP, format_group_label, normalize_group_name
 
 if TYPE_CHECKING:
     from app.analyzer import StockAnalysis
@@ -80,10 +81,15 @@ def format_risk_reward(value: float | int | None) -> str:
     return f"1:{number:.2f}"
 
 
-def generate_text_report(results: list[StockAnalysis], top_n: int | None = None) -> str:
+def generate_text_report(
+    results: list[StockAnalysis],
+    top_n: int | None = None,
+    group_name: str = DEFAULT_GROUP,
+) -> str:
     shown_results = results[:top_n] if top_n else results
     lines: list[str] = [
-        "HASIL SCREENING SAHAM IDX GRATIS",
+        "HASIL SCREENING SAHAM IDX",
+        f"Group: {format_group_label(group_name)}",
         f"Tanggal: {today_string()}",
         "Sumber data: Yahoo Finance / yfinance",
         "Catatan: Data bukan real-time resmi IDX.",
@@ -129,19 +135,31 @@ def generate_text_report(results: list[StockAnalysis], top_n: int | None = None)
     return "\n".join(lines).strip() + "\n"
 
 
-def save_text_report(results: list[StockAnalysis], top_n: int | None = None) -> Path:
+def _safe_group_name(group_name: str) -> str:
+    return normalize_group_name(group_name).replace("_", "-")
+
+
+def save_text_report(
+    results: list[StockAnalysis],
+    top_n: int | None = None,
+    group_name: str = DEFAULT_GROUP,
+) -> Path:
     ensure_directories()
-    path = settings.reports_dir / f"report_{today_string()}.txt"
-    path.write_text(generate_text_report(results, top_n=top_n), encoding="utf-8")
+    path = settings.reports_dir / f"report_{_safe_group_name(group_name)}_{today_string()}.txt"
+    path.write_text(
+        generate_text_report(results, top_n=top_n, group_name=group_name),
+        encoding="utf-8",
+    )
     return path
 
 
-def export_csv(results: list[StockAnalysis]) -> Path:
+def export_csv(results: list[StockAnalysis], group_name: str = DEFAULT_GROUP) -> Path:
     ensure_directories()
-    path = settings.reports_dir / f"screening_{today_string()}.csv"
+    path = settings.reports_dir / f"screening_{_safe_group_name(group_name)}_{today_string()}.csv"
     records = [item.to_dict() for item in results]
     frame = pd.DataFrame(records)
     if not frame.empty:
+        frame.insert(0, "group", normalize_group_name(group_name))
         frame["reasons"] = frame["reasons"].apply(lambda values: "; ".join(values))
         frame["warnings"] = frame["warnings"].apply(lambda values: "; ".join(values))
     frame.to_csv(path, index=False)
