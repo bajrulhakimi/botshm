@@ -17,7 +17,7 @@ Analisa ini hanya alat bantu screening, bukan rekomendasi beli/jual resmi. Semua
 
 ## Fitur
 
-- Scan semua saham dari `data/stocks.csv`.
+- Scan 300 saham IDX lintas sektor dari `data/stocks.csv`.
 - Otomatis mengubah kode IDX menjadi format Yahoo Finance `.JK`, contoh `BBCA` menjadi `BBCA.JK`.
 - Ambil data harga harian minimal 1 tahun. Default kode memakai `2y` agar MA200 lebih stabil.
 - Hitung MA5, MA10, MA20, MA50, MA100, MA200, EMA12, EMA26, RSI14, MACD, MACD Signal, MACD Histogram, Volume MA20, Volume Ratio, Support 20H, Resistance 20H, ATR14, perubahan harian, mingguan, dan bulanan.
