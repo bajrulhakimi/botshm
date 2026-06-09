@@ -209,6 +209,7 @@ def scan_all_stocks(group_name: str = DEFAULT_GROUP) -> list[StockAnalysis]:
         print(f"Daftar saham group {group_name} kosong.")
         return results
 
+    print(f"Memulai scan group {group_name}: {len(codes)} saham.")
     for code in codes:
         try:
             result = analyze_stock(code)

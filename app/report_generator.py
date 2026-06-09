@@ -8,7 +8,12 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from app.config import ensure_directories, settings
-from app.stock_universe import DEFAULT_GROUP, format_group_label, normalize_group_name
+from app.stock_universe import (
+    DEFAULT_GROUP,
+    format_group_label,
+    load_group_symbols,
+    normalize_group_name,
+)
 
 if TYPE_CHECKING:
     from app.analyzer import StockAnalysis
@@ -87,9 +92,15 @@ def generate_text_report(
     group_name: str = DEFAULT_GROUP,
 ) -> str:
     shown_results = results[:top_n] if top_n else results
+    try:
+        universe_size = len(load_group_symbols(group_name))
+    except (FileNotFoundError, ValueError):
+        universe_size = len(results)
     lines: list[str] = [
         "HASIL SCREENING SAHAM IDX",
         f"Group: {format_group_label(group_name)}",
+        f"Jumlah saham dalam group: {universe_size}",
+        f"Berhasil dianalisa: {len(results)}",
         f"Tanggal: {today_string()}",
         "Sumber data: Yahoo Finance / yfinance",
         "Catatan: Data bukan real-time resmi IDX.",

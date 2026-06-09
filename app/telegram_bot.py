@@ -20,6 +20,7 @@ from app.stock_universe import (
     GROUP_NOT_FOUND_MESSAGE,
     format_group_label,
     get_available_groups,
+    load_group_symbols,
     validate_group,
 )
 
@@ -128,9 +129,15 @@ def build_top_results_message(
     group_name: str = DEFAULT_GROUP,
 ) -> str:
     shown_results = results[: top_n or settings.top_n]
+    try:
+        universe_size = len(load_group_symbols(group_name))
+    except (FileNotFoundError, ValueError):
+        universe_size = len(results)
     lines = [
         "HASIL SCREENING SAHAM IDX",
         f"Group: {format_group_label(group_name)}",
+        f"Jumlah saham dalam group: {universe_size}",
+        f"Berhasil dianalisa: {len(results)}",
         f"Tanggal: {today_string()}",
         "Sumber data: Yahoo Finance / yfinance",
         "Catatan: data bukan real-time resmi IDX.",
@@ -328,7 +335,10 @@ def handle_telegram_message(message: dict) -> None:
     if command in {"/start", "/help"}:
         send_message(HELP_MESSAGE, chat_id=chat_id)
     elif command == "/status":
-        send_message("Bot aktif dan siap menerima command.", chat_id=chat_id)
+        send_message(
+            f"Bot aktif dan siap menerima command.\nGroup tersedia: {len(get_available_groups())}",
+            chat_id=chat_id,
+        )
     elif command == "/groups":
         groups = "\n".join(f"- {group}" for group in get_available_groups())
         send_message("Available groups:\n" + groups, chat_id=chat_id)
