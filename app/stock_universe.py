@@ -32,6 +32,28 @@ GROUP_ORDER = [
     "technology",
 ]
 
+INDEX_GROUPS = [
+    "all",
+    "lq45",
+    "idx30",
+    "idx80",
+    "kompas100",
+    "jii",
+    "high-dividend",
+    "esg",
+    "msci",
+]
+
+SECTOR_GROUPS = [
+    "banking",
+    "energy",
+    "mining",
+    "consumer",
+    "telecom",
+    "property",
+    "technology",
+]
+
 
 def normalize_symbol(symbol: str) -> str:
     clean_symbol = symbol.strip().upper().replace(".JK", "")
@@ -73,6 +95,15 @@ def get_available_groups() -> list[str]:
     ordered = [group for group in GROUP_ORDER if group == "all" or group in discovered]
     extra = [group for group in discovered if group not in ordered]
     return ordered + extra
+
+
+def format_groups_list() -> str:
+    available = set(get_available_groups())
+    lines = ["AVAILABLE GROUPS", "", "[INDEKS / UNIVERSE]"]
+    lines.extend(f"- {group}" for group in INDEX_GROUPS if group in available)
+    lines.extend(["", "[SEKTOR]"])
+    lines.extend(f"- {group}" for group in SECTOR_GROUPS if group in available)
+    return "\n".join(lines)
 
 
 def validate_group(group_name: str | None) -> str:

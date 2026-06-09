@@ -86,6 +86,17 @@ def format_risk_reward(value: float | int | None) -> str:
     return f"1:{number:.2f}"
 
 
+def summarize_results(results: list[StockAnalysis]) -> dict[str, int]:
+    return {
+        "strong": sum(item.score >= 85 for item in results),
+        "interesting": sum(75 <= item.score < 85 for item in results),
+        "watchlist": sum(65 <= item.score < 75 for item in results),
+        "neutral": sum(50 <= item.score < 65 for item in results),
+        "not_interesting": sum(item.score < 50 for item in results),
+        "qualified": sum(item.score >= settings.min_score for item in results),
+    }
+
+
 def generate_text_report(
     results: list[StockAnalysis],
     top_n: int | None = None,
@@ -96,15 +107,30 @@ def generate_text_report(
         universe_size = len(load_group_symbols(group_name))
     except (FileNotFoundError, ValueError):
         universe_size = len(results)
+    summary = summarize_results(results)
+    skipped = max(0, universe_size - len(results))
     lines: list[str] = [
+        "=" * 64,
         "HASIL SCREENING SAHAM IDX",
-        f"Group: {format_group_label(group_name)}",
-        f"Jumlah saham dalam group: {universe_size}",
-        f"Berhasil dianalisa: {len(results)}",
-        f"Tanggal: {today_string()}",
-        "Sumber data: Yahoo Finance / yfinance",
-        "Catatan: Data bukan real-time resmi IDX.",
-        f"Batasan data gratis: {DATA_LIMITATION}",
+        "=" * 64,
+        "",
+        "[INFORMASI SCAN]",
+        f"Group              : {format_group_label(group_name)}",
+        f"Jumlah dalam group : {universe_size}",
+        f"Berhasil dianalisa : {len(results)}",
+        f"Dilewati/gagal     : {skipped}",
+        f"Tanggal            : {today_string()}",
+        "Sumber data         : Yahoo Finance / yfinance",
+        "",
+        "[RINGKASAN SKOR]",
+        f"Kandidat skor >= {settings.min_score:<3}: {summary['qualified']}",
+        f"Sangat Kuat (>=85)    : {summary['strong']}",
+        f"Menarik (75-84)       : {summary['interesting']}",
+        f"Watchlist (65-74)      : {summary['watchlist']}",
+        f"Netral (50-64)         : {summary['neutral']}",
+        f"Belum Menarik (<50)    : {summary['not_interesting']}",
+        "",
+        "[PERINGKAT HASIL]",
         "",
     ]
 
@@ -113,36 +139,51 @@ def generate_text_report(
     for index, item in enumerate(shown_results, start=1):
         lines.extend(
             [
-                f"{index}. {item.stock_code}",
-                f"Skor: {item.score}/100",
-                f"Status: {item.status}",
-                f"Harga Terakhir: {format_price(item.last_price)}",
-                f"Perubahan Harian: {format_pct(item.daily_change)}",
-                f"Perubahan Mingguan: {format_pct(item.weekly_change)}",
-                f"Perubahan Bulanan: {format_pct(item.monthly_change)}",
-                f"Volume Ratio: {format_ratio(item.volume_ratio)}",
-                f"RSI: {item.rsi:.2f}",
-                f"MACD: {item.macd_status}",
-                f"Trend: {item.trend_status}",
-                f"Support 20H: {format_price(item.support_20)}",
-                f"Resistance 20H: {format_price(item.resistance_20)}",
-                f"Jarak ke Support: {format_pct(item.distance_to_support_pct)}",
-                f"Jarak ke Resistance: {format_pct(item.distance_to_resistance_pct)}",
-                f"Entry Area: {format_price(item.entry_low)} - {format_price(item.entry_high)}",
-                f"Stop Loss: {format_price(item.stop_loss)}",
-                f"Target 1: {format_price(item.target_1)}",
-                f"Target 2: {format_price(item.target_2)}",
-                f"Risk Reward: {format_risk_reward(item.risk_reward)}",
-                "Alasan:",
+                "-" * 64,
+                f"#{index} {item.stock_code} | SKOR {item.score}/100 | {item.status}",
+                "-" * 64,
+                "[SINYAL PASAR]",
+                f"Harga        : {format_price(item.last_price)}",
+                f"Perubahan    : Harian {format_pct(item.daily_change)} | "
+                f"Mingguan {format_pct(item.weekly_change)} | Bulanan {format_pct(item.monthly_change)}",
+                f"Trend        : {item.trend_status}",
+                f"MACD         : {item.macd_status}",
+                f"RSI          : {item.rsi:.2f}",
+                f"Volume Ratio : {format_ratio(item.volume_ratio)}",
+                f"Breakout     : {'Ya' if item.breakout else 'Tidak'}",
+                "",
+                "[SUPPORT / RESISTANCE]",
+                f"Support 20H    : {format_price(item.support_20)} "
+                f"({format_pct(item.distance_to_support_pct)} dari harga)",
+                f"Resistance 20H : {format_price(item.resistance_20)} "
+                f"({format_pct(item.distance_to_resistance_pct)} dari harga)",
+                "",
+                "[RENCANA TRANSAKSI]",
+                f"Entry Area  : {format_price(item.entry_low)} - {format_price(item.entry_high)}",
+                f"Stop Loss   : {format_price(item.stop_loss)}",
+                f"Target 1    : {format_price(item.target_1)}",
+                f"Target 2    : {format_price(item.target_2)}",
+                f"Risk Reward : {format_risk_reward(item.risk_reward)}",
+                "",
+                "[ALASAN SKOR]",
             ]
         )
         lines.extend(f"- {reason}" for reason in item.reasons)
         if item.warnings:
-            lines.append("Peringatan:")
+            lines.extend(["", "[PERINGATAN RISIKO]"])
             lines.extend(f"- {warning}" for warning in item.warnings)
         lines.append("")
 
-    lines.extend(["Disclaimer:", DISCLAIMER])
+    lines.extend(
+        [
+            "=" * 64,
+            "[BATASAN DATA]",
+            DATA_LIMITATION,
+            "",
+            "[DISCLAIMER]",
+            DISCLAIMER,
+        ]
+    )
     return "\n".join(lines).strip() + "\n"
 
 

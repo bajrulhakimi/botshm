@@ -82,11 +82,9 @@ def command_export(group_name: str) -> int:
 
 
 def command_groups() -> int:
-    from app.stock_universe import get_available_groups
+    from app.stock_universe import format_groups_list
 
-    print("Available groups:")
-    for group in get_available_groups():
-        print(f"- {group}")
+    print(format_groups_list())
     return 0
 
 

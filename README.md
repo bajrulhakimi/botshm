@@ -26,6 +26,7 @@ Analisa ini hanya alat bantu screening, bukan rekomendasi beli/jual resmi. Semua
 - Analisa breakout, volume, trend, RSI, MACD golden cross, support/resistance, dan risiko.
 - Hitung entry area, stop loss, target 1, target 2, dan risk reward.
 - Output terminal, laporan TXT, SQLite, export CSV, dan Telegram.
+- Laporan terstruktur menjadi informasi scan, ringkasan skor, peringkat hasil, sinyal pasar, support/resistance, rencana transaksi, alasan skor, dan peringatan risiko.
 - Tetap lanjut jika satu ticker gagal atau data kosong.
 
 ## Struktur Project

@@ -13,12 +13,14 @@ from app.report_generator import (
     format_price,
     format_ratio,
     format_risk_reward,
+    summarize_results,
     today_string,
 )
 from app.stock_universe import (
     DEFAULT_GROUP,
     GROUP_NOT_FOUND_MESSAGE,
     format_group_label,
+    format_groups_list,
     get_available_groups,
     load_group_symbols,
     validate_group,
@@ -133,14 +135,22 @@ def build_top_results_message(
         universe_size = len(load_group_symbols(group_name))
     except (FileNotFoundError, ValueError):
         universe_size = len(results)
+    summary = summarize_results(results)
+    skipped = max(0, universe_size - len(results))
     lines = [
         "HASIL SCREENING SAHAM IDX",
+        "",
+        "[INFORMASI SCAN]",
         f"Group: {format_group_label(group_name)}",
-        f"Jumlah saham dalam group: {universe_size}",
-        f"Berhasil dianalisa: {len(results)}",
+        f"Anggota: {universe_size} | Dianalisa: {len(results)} | Dilewati: {skipped}",
         f"Tanggal: {today_string()}",
-        "Sumber data: Yahoo Finance / yfinance",
-        "Catatan: data bukan real-time resmi IDX.",
+        "",
+        "[RINGKASAN SKOR]",
+        f"Kandidat >= {settings.min_score}: {summary['qualified']}",
+        f"Sangat Kuat: {summary['strong']} | Menarik: {summary['interesting']} | Watchlist: {summary['watchlist']}",
+        f"Netral: {summary['neutral']} | Belum Menarik: {summary['not_interesting']}",
+        "",
+        f"[TOP {len(shown_results)} HASIL]",
         "",
     ]
 
@@ -150,18 +160,16 @@ def build_top_results_message(
     for index, item in enumerate(shown_results, start=1):
         lines.extend(
             [
-                f"{index}. {item.stock_code} - {item.score}/100 ({item.status})",
-                f"Harga: {format_price(item.last_price)} | Harian: {format_pct(item.daily_change)}",
-                f"Volume: {format_ratio(item.volume_ratio)} | RSI: {item.rsi:.2f} | MACD: {item.macd_status}",
-                f"Trend: {item.trend_status}",
+                f"#{index} {item.stock_code} | {item.score}/100 | {item.status}",
+                f"Sinyal: {item.trend_status} | MACD {item.macd_status} | RSI {item.rsi:.2f}",
+                f"Harga: {format_price(item.last_price)} | Harian {format_pct(item.daily_change)} | Volume {format_ratio(item.volume_ratio)}",
                 f"Entry: {format_price(item.entry_low)} - {format_price(item.entry_high)}",
-                f"SL: {format_price(item.stop_loss)} | T1: {format_price(item.target_1)} | T2: {format_price(item.target_2)}",
-                f"RR: {format_risk_reward(item.risk_reward)}",
+                f"SL: {format_price(item.stop_loss)} | T1: {format_price(item.target_1)} | T2: {format_price(item.target_2)} | RR {format_risk_reward(item.risk_reward)}",
                 "",
             ]
         )
 
-    lines.extend(["Batasan:", DATA_LIMITATION, "", "Disclaimer:", DISCLAIMER])
+    lines.extend(["[BATASAN DATA]", DATA_LIMITATION, "", "[DISCLAIMER]", DISCLAIMER])
     return "\n".join(lines).strip()
 
 
@@ -340,8 +348,7 @@ def handle_telegram_message(message: dict) -> None:
             chat_id=chat_id,
         )
     elif command == "/groups":
-        groups = "\n".join(f"- {group}" for group in get_available_groups())
-        send_message("Available groups:\n" + groups, chat_id=chat_id)
+        send_message(format_groups_list(), chat_id=chat_id)
     elif command == "/stock":
         _handle_stock_command(args, chat_id)
     elif command in {"/scan", "/send"}:
